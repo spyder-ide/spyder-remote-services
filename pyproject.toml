@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spyder-remote-server"
+version = "0.0.1.dev0"
+authors = [{name="Hendrik D. Louzada", email="hendriklouzada@gmail.com" }]
+description = "A remote server for Spyder IDE"
+readme = "README.md"
+dependencies = [
+    "jupyterhub",
+    "tornado",
+    "spyder_kernels"
+]
+requires-python = ">=3.6"
+
+[project.urls]
+"Homepage" = "https://https://github.com/spyder-ide/spyder-remote-server"
