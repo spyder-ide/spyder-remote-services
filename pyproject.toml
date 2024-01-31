@@ -17,3 +17,6 @@ requires-python = ">=3.6"
 
 [project.urls]
 "Homepage" = "https://https://github.com/spyder-ide/spyder-remote-server"
+
+[project.scripts]
+spyder-remote-server = "spyder_remote_server.__main__:main"
