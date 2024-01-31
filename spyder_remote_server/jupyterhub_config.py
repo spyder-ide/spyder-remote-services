@@ -7,9 +7,6 @@ c.JupyterHub.hub_routespec = "/hub/api"
 c.JupyterHub.authenticator_class = NullAuthenticator
 c.JupyterHub.spawner_class = LocalProcessSpawner
 
-c.JupyterHub.admin_users = ["user1"]
-c.JupyterHub.admin_access = True
-
 public_host = "http://127.0.0.1:8000"
 service_name = "spyder-service"
 
