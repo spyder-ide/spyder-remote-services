@@ -1,6 +1,6 @@
 import tornado
 
-from spyder_remote_server.app.kernel_manager.core import KernelManager
+from spyder_remote_server.services.kernel_manager.core import KernelManager
 
 
 class KernelHandler(tornado.web.RequestHandler):

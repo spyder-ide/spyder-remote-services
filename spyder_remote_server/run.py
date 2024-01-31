@@ -3,7 +3,7 @@ import argparse
 import tornado
 import asyncio
 
-from spyder_remote_server.app.routes import ROUTES
+from spyder_remote_server.services.routes import ROUTES
 
 
 async def main(port):
