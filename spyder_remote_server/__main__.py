@@ -15,8 +15,8 @@ def main():
     if "--port" not in argv:
         port = get_free_port()
         argv.extend(["--port", str(port)])
-    if (index := argv.index("--show-port")) != -1:
-        argv.pop(index)
+    if "--show-port" in argv:
+        argv.remove("--show-port")
         print(port)
     JupyterHub.launch_instance(argv)
 
