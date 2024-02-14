@@ -1,22 +1,25 @@
-[build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
-
-[project]
+[tool.poetry]
 name = "spyder-remote-server"
 version = "0.0.1.dev0"
-authors = [{name="Hendrik D. Louzada", email="hendriklouzada@gmail.com" }]
+authors = ["Hendrik Louzada <hendriklouzada@gmail.com>"]
 description = "A remote server for Spyder IDE"
 readme = "README.md"
-dependencies = [
-    "jupyterhub",
-    "tornado",
-    "spyder_kernels"
-]
-requires-python = ">=3.6"
+packages = [{include = "spyder_remote_server"}]
 
-[project.urls]
-"Homepage" = "https://https://github.com/spyder-ide/spyder-remote-server"
-
-[project.scripts]
+[tool.poetry.scripts]
 spyder-remote-server = "spyder_remote_server.__main__:main"
+build = "spyder_remote_server.pyinstaller:install"
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.12"
+jupyterhub = "^4.0.2"
+tornado = "^6.3.3"
+spyder-kernels = "^3.0.0b0"
+
+[tool.poetry.group.dev.dependencies]
+pyinstaller = "^5.10.1"
+pytest = "^7.3.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
