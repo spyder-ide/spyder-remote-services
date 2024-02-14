@@ -101,7 +101,6 @@ class KernelManager:
         for process in self.kernels.values():
             process.terminate()
             process.join()
-        super().__del__()
 
     async def start_kernel(self):
         # Logic to start a kernel and return connection info
