@@ -282,6 +282,20 @@ files = [
 ]
 
 [[package]]
+name = "click"
+version = "8.1.7"
+description = "Composable command line interface toolkit"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "click-8.1.7-py3-none-any.whl", hash = "sha256:ae74fb96c20a0277a1d615f1e4d73c8414f5a98db8b799a7931d1582f3390c28"},
+    {file = "click-8.1.7.tar.gz", hash = "sha256:ca9853ad459e787e2192211578cc907e7594e294c7ccc834310722b41b9ca6de"},
+]
+
+[package.dependencies]
+colorama = {version = "*", markers = "platform_system == \"Windows\""}
+
+[[package]]
 name = "cloudpickle"
 version = "3.0.0"
 description = "Pickler class to extend the standard pickle.Pickler functionality"
@@ -319,6 +333,25 @@ traitlets = ">=4"
 
 [package.extras]
 test = ["pytest"]
+
+[[package]]
+name = "configurable-http-proxy"
+version = "0.3.0"
+description = "A python implementation of configurable-http-proxy"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "configurable-http-proxy-0.3.0.tar.gz", hash = "sha256:8f5f82377ac699549ab618892addfbaa0052cb2dc7c0aed1034bc88e4953b555"},
+    {file = "configurable_http_proxy-0.3.0-py2.py3-none-any.whl", hash = "sha256:f75ca53ed7ffe7592b212cbbea6f66a41e2f0d8bf89edabb9c47f5d25a5e064f"},
+]
+
+[package.dependencies]
+click = "*"
+python-dateutil = "*"
+tornado = "*"
+
+[package.extras]
+sql = ["dataset"]
 
 [[package]]
 name = "cryptography"
@@ -1848,4 +1881,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.12"
-content-hash = "161a16ab703b98501db2d5d927f63b7c5cf6bf8ae29350e7e67c7c8f0474b06d"
+content-hash = "7772578fe7f5216fd45f1df39f7a1d208cbd0e6d7ad0898e48de81882f64375d"
