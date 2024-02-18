@@ -1,23 +1,22 @@
-import os
-from pathlib import Path
-import sys
+import argparse
 
-from jupyterhub.app import JupyterHub
+import configurable_http_proxy.cli
 
-from spyder_remote_server.utils import get_free_port
-
-HERE = Path(os.path.abspath(os.path.dirname(__file__)))
+from spyder_remote_server import run_jupyterhub, run_service
 
 def main():
-    """Starts jupyterhub."""
-    argv = ["--config", str(HERE / "jupyterhub_config.py")]
-    argv.extend(sys.argv[1:])
-    if "--port" not in argv:
-        port = get_free_port()
-        argv.extend(["--port", str(port)])
-    if "--show-port" in argv:
-        argv.remove("--show-port")
-        print(port)
-    JupyterHub.launch_instance(argv)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--juptyerhub", action="store_true")
+    parser.add_argument("--configurable-http-proxy", action="store_true")
+    parser.add_argument("--run-service", action="store_true")
+    args, rest = parser.parse_known_args()
+    if args.juptyerhub:
+        run_jupyterhub.main(rest)
+    elif args.configurable_http_proxy:
+        configurable_http_proxy.cli.main(rest)
+    elif args.run_service:
+        run_service.main(rest)
+    else:
+        parser.print_help()
 
 main()
