@@ -1,11 +1,10 @@
 version: "3"
 
 services:
-  jupyterhub:
+  spyder-remote-server:
     build: .
     volumes:
-      - "../jupyterhub_config.py:/opt/jupyterhub_config.py"
-      - "../spyder-service:/home/ubuntu/spyder-service"
+      - "../spyder_remote_server:/home/ubuntu/spyder_remote_server"
     networks:
       mynet:
         ipv4_address: 172.16.128.2
