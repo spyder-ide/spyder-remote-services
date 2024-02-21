@@ -12,7 +12,7 @@ configurable-http-proxy = "spyder_remote_server.configurable_http_proxy:main"
 build = "pyinstaller:install"
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.12"
+python = ">=3.10,<4.0.0"
 jupyterhub = "^4.0.2"
 configurable-http-proxy = ">=0.3.0"
 tornado = "^6.3.3"
@@ -23,5 +23,5 @@ pyinstaller = "^5.10.1"
 pytest = "^7.3.1"
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=1.0.8"]
 build-backend = "poetry.core.masonry.api"
