@@ -14,13 +14,14 @@ USER root
 
 # Install required tools.
 RUN apt-get -qq update \
+    && apt-get -qq --no-install-recommends install curl \
     && apt-get -qq --no-install-recommends install vim-tiny=2:8.1.* \
     && apt-get -qq --no-install-recommends install sudo=1.8.* \
     && apt-get -qq --no-install-recommends install python3-pip \
     && apt-get -qq --no-install-recommends install python3 \
     && apt-get -qq --no-install-recommends install python3-dev \
     && apt-get -qq --no-install-recommends install openssh-server=1:8.* \
-    && apt-get -qq clean    \
+    && apt-get -qq clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Configure SSHD.
