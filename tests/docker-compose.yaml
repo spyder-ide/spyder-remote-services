@@ -3,8 +3,8 @@ version: "3"
 services:
   spyder-remote-server:
     build: .
-    volumes:
-      - "../spyder_remote_server:/home/ubuntu/spyder_remote_server"
+    # volumes:
+    #   - "..:/home/ubuntu/spyder_remote_server"
     networks:
       mynet:
         ipv4_address: 172.16.128.2
