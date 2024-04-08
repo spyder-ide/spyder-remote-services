@@ -29,6 +29,7 @@ with open("jupyterhub.port", "w") as f:
 c.JupyterHub.hub_port = jupyterhub_hub_port
 
 c.JupyterHub.port = jupyterhub_port
+c.JupyterHub.pid_file = "jupyterhub.pid"
 
 c.JupyterHub.services = [
     {

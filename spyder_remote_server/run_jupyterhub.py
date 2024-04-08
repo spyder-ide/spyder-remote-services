@@ -17,5 +17,6 @@ def main(argv=[]):
 
     JupyterHub.launch_instance(argv)
 
+
 if __name__ == "__main__":
     main(sys.argv[1:])
