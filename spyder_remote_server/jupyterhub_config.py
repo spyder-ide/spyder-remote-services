@@ -20,9 +20,15 @@ c.ConfigurableHTTPProxy.command = [spyder_remote_server_exec, "--configurable-ht
 
 service_name = "spyder-service"
 service_port = get_free_port()
+jupyterhub_hub_port = get_free_port()
+jupyterhub_port = get_free_port()
 
-c.JupyterHub.hub_ip = '127.0.0.1'
-c.JupyterHub.hub_port = get_free_port()
+with open("jupyterhub.port", "w") as f:
+    f.write(str(jupyterhub_port))
+
+c.JupyterHub.hub_port = jupyterhub_hub_port
+
+c.JupyterHub.port = jupyterhub_port
 
 c.JupyterHub.services = [
     {
