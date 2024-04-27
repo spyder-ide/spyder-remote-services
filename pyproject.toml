@@ -8,19 +8,20 @@ packages = [{include = "spyder_remote_server"}]
 
 [tool.poetry.scripts]
 spyder-remote-server = "spyder_remote_server.__main__:main"
-configurable-http-proxy = "spyder_remote_server.configurable_http_proxy:main"
 build = "pyinstaller:install"
 
 [tool.poetry.dependencies]
-python = ">=3.10,<4.0.0"
+python = ">=3.10,<3.13.0"
 jupyterhub = "^4.0.2"
+jupyter_server = "^1.24.0"
+jupyter_client = "^8.6.1"
 configurable-http-proxy = ">=0.3.0"
-tornado = "^6.3.3"
 spyder-kernels = "^3.0.0b0"
 
 [tool.poetry.group.dev.dependencies]
 #pyinstaller = "^5.10.1"
 pytest = "^7.3.1"
+ruff = "^0.4.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.8"]
