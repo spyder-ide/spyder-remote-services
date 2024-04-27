@@ -55,7 +55,6 @@ class SpyderRemoteServer(JupyterHub):
         """,
     ).tag(config=True)
 
-
     @default('services')
     def _services_default(self):
         spyder_token = generate_token()
@@ -108,11 +107,11 @@ class SpyderRemoteServer(JupyterHub):
     @default('hub_routespec')
     def _default_hub_routespec(self):
         if self.subdomain_host:
-            routespec = '/hub/api'
+            routespec = '/hub/api/'
         elif self.base_url[-1] == '/':
-            routespec = self.base_url + 'hub/api'
+            routespec = self.base_url + 'hub/api/'
         else:
-            routespec = self.base_url + '/hub/api'
+            routespec = self.base_url + '/hub/api/'
         return routespec
 
     def write_port_file(self):
