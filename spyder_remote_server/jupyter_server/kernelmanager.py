@@ -16,13 +16,18 @@ class SpyderAsyncMappingKernelManager(AsyncMappingKernelManager):
         self._check_kernel_id(kernel_id)
         kernel = self._kernels[kernel_id]
 
+        conn_info = kernel.get_connection_info()
+
+        # convert key bytes to str
+        conn_info["key"] = conn_info["key"].decode()
+
         model = {
             "id": kernel_id,
             "name": kernel.kernel_name,
             "last_activity": isoformat(kernel.last_activity),
             "execution_state": kernel.execution_state,
             "connections": self._kernel_connections.get(kernel_id, 0),
-            "connection_info": kernel.get_connection_info(),
+            "connection_info": conn_info,
         }
         if getattr(kernel, "reason", None):
             model["reason"] = kernel.reason
