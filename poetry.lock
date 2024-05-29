@@ -1908,13 +1908,13 @@ files = [
 
 [[package]]
 name = "spyder-kernels"
-version = "3.0.0b5"
+version = "3.0.0b6"
 description = "Jupyter kernels for Spyder's console"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "spyder-kernels-3.0.0b5.tar.gz", hash = "sha256:aeed594b9e98e4bcc3b6e726ecafd023454001ef6cecee3627fcaed0614aab81"},
-    {file = "spyder_kernels-3.0.0b5-py3-none-any.whl", hash = "sha256:3018c89534925e1c2f2694ffd79db2d6a49255a654234748fa167a6fe6630bb6"},
+    {file = "spyder_kernels-3.0.0b6-py3-none-any.whl", hash = "sha256:ecadddf5cecae0f293ace74cc26b3fcec0ec4a033797d7de2fff745fe56d27b7"},
+    {file = "spyder_kernels-3.0.0b6.tar.gz", hash = "sha256:5432265b73788b304ed641c0e5ce0a3ced7b853caa318323722ef364179adb88"},
 ]
 
 [package.dependencies]
