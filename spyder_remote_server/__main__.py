@@ -1,44 +1,20 @@
 import argparse
 
-import configurable_http_proxy.cli
-
-from spyder_remote_server.jupyterhub.app import (
-    SpyderRemoteServer,
-    main as jupyterhub_main,
-)
-from spyder_remote_server.jupyterhub.singleuser import main as singleuser_main
+from spyder_remote_server.jupyter_server.serverapp import launch_new_instance, get_running_server
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser()
-    parser.add_argument('--jupyterhub', action='store_true')
-    parser.add_argument('--jupyterhub-singleuser', action='store_true')
-    parser.add_argument('--configurable-http-proxy', action='store_true')
-    parser.add_argument('--get-running-port', action='store_true')
-    parser.add_argument('--get-running-pid', action='store_true')
-    parser.add_argument('--get-running-token', action='store_true')
+    parser.add_argument('--jupyter-server', action='store_true', help="Start the Spyder's Jupyter server")
+    parser.add_argument('--get-running-info', action='store_true', help="Get the running server info")
     args, rest = parser.parse_known_args(argv)
-    if args.jupyterhub:
-        jupyterhub_main(rest)
-    elif args.jupyterhub_singleuser:
-        singleuser_main(rest)
-    elif args.configurable_http_proxy:
-        configurable_http_proxy.cli.main(rest)
-    elif args.get_running_pid:
-        if pid := SpyderRemoteServer.get_running_pid():
-            print(f'PID: {pid}')
+    if args.jupyter_server:
+        launch_new_instance(rest)
+    elif args.get_running_info:
+        if info := get_running_server(as_str=True):
+            print(info)
         else:
-            print('No PID found.')
-    elif args.get_running_port:
-        if port := SpyderRemoteServer.get_running_port():
-            print(f'Port: {port}')
-        else:
-            print('No port found.')
-    elif args.get_running_token:
-        if token := SpyderRemoteServer.get_running_token():
-            print(f'Token: {token}')
-        else:
-            print('No token found.')
+            print('No info found.')
     else:
         parser.print_help()
 
