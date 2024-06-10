@@ -11,11 +11,9 @@ spyder-remote-server = "spyder_remote_server.__main__:main"
 build = "pyinstaller:install"
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.13.0"
-jupyterhub = "^4.0.2"
+python = ">=3.10"
 jupyter_server = "^1.24.0"
 jupyter_client = "^8.6.1"
-configurable-http-proxy = ">=0.3.0"
 spyder-kernels = "^3.0.0b0"
 
 [tool.poetry.group.dev.dependencies]
