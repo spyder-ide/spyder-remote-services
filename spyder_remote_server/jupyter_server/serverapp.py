@@ -36,7 +36,8 @@ class SpyderServerApp(ServerApp):
 
     @property
     def info_file(self):
-        return Path(self.runtime_dir) / SYPDER_SERVER_INFO_FILE
+        return str((Path(self.runtime_dir) /
+                    SYPDER_SERVER_INFO_FILE).resolve())
 
 
 def get_running_server(runtime_dir=None, log=None, *, as_str=False):
