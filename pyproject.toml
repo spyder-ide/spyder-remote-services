@@ -1,26 +1,26 @@
-[tool.poetry]
+[project]
 name = "spyder-remote-server"
-version = "0.0.1.dev0"
-authors = ["Hendrik Louzada <hendriklouzada@gmail.com>"]
+authors = [{name = "Hendrik Louzada", email = "hendriklouzada@gmail.com"}]
 description = "A remote server for Spyder IDE"
 readme = "README.md"
-packages = [{include = "spyder_remote_server"}]
+dynamic = ["version"]
+requires-python = ">=3.10"
+dependencies = [
+    "jupyter_server >= 1.24.0",
+    "jupyter_client >= 8.6.1",
+    "spyder-kernels >= 3.0.0b7,<3.0.0b8",
+]
 
-[tool.poetry.scripts]
+[project.scripts]
 spyder-remote-server = "spyder_remote_server.__main__:main"
-build = "pyinstaller:install"
 
-[tool.poetry.dependencies]
-python = ">=3.10"
-jupyter_server = "^1.24.0"
-jupyter_client = "^8.6.1"
-spyder-kernels = "^3.0.0b0"
-
-[tool.poetry.group.dev.dependencies]
-#pyinstaller = "^5.10.1"
-pytest = "^7.3.1"
-ruff = "^0.4.1"
+[project.optional-dependencies]
+dev = [
+    "pytest >= 7.3.1",
+    "ruff >= 0.4.1",
+    #"pyinstaller >= 5.10.1"
+]
 
 [build-system]
-requires = ["poetry-core>=1.0.8"]
-build-backend = "poetry.core.masonry.api"
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
