@@ -6,7 +6,7 @@ from jupyter_server._tz import isoformat
 
 
 class SpyderAsyncMappingKernelManager(AsyncMappingKernelManager):
-    kernel_manager_class = 'spyder_remote_server.jupyter_client.manager.SpyderAsyncIOLoopKernelManager'
+    kernel_manager_class = 'spyder_remote_services.jupyter_client.manager.SpyderAsyncIOLoopKernelManager'
 
     def kernel_model(self, kernel_id):
         """Return a JSON-safe dict representing a kernel

@@ -8,10 +8,10 @@ from jupyter_core.paths import jupyter_runtime_dir
 from jupyter_server.serverapp import ServerApp
 from traitlets import Bool, default
 
-from spyder_remote_server.jupyter_server.kernelmanager import (
+from spyder_remote_services.jupyter_server.kernelmanager import (
     SpyderAsyncMappingKernelManager,
 )
-from spyder_remote_server.utils import get_free_port
+from spyder_remote_services.utils import get_free_port
 
 
 SYPDER_SERVER_INFO_FILE = "jpserver-spyder.json"

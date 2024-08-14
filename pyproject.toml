@@ -1,5 +1,5 @@
 [project]
-name = "spyder-remote-server"
+name = "spyder-remote-services"
 authors = [{name = "Hendrik Louzada", email = "hendriklouzada@gmail.com"}]
 description = "A remote server for Spyder IDE"
 readme = "README.md"
@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.scripts]
-spyder-remote-server = "spyder_remote_server.__main__:main"
+spyder-remote-server = "spyder_remote_services.__main__:main"
 
 [project.optional-dependencies]
 dev = [
