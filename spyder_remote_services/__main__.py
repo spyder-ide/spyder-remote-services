@@ -1,6 +1,9 @@
 import argparse
 
-from spyder_remote_server.jupyter_server.serverapp import launch_new_instance, get_running_server
+from spyder_remote_services.jupyter_server.serverapp import (
+    get_running_server,
+    launch_new_instance,
+)
 
 
 def main(argv=None):
