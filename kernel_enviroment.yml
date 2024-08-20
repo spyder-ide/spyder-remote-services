@@ -1,5 +1,6 @@
-name: spyder-remote
+name: spyder-kernel
 channels:
+  - conda-forge/label/spyder_kernels_rc
   - conda-forge  
   # We want to have a reproducible setup, so we don't want default channels,
   # which may be different for different users. All required channels should
@@ -8,5 +9,4 @@ channels:
 dependencies:
   - python=3.12.*
   - pip
-  - jupyter_server >=1.24.0,<2.0
-  - jupyter_client >=8.6.1,<9.0
+  - spyder-kernels
