@@ -5,7 +5,7 @@ class SpyderAsyncIOLoopKernelManager(AsyncIOLoopKernelManager):
     def format_kernel_cmd(self, extra_arguments=None):
         """Format the kernel command line to be run."""
         # avoids sporadical warning on kernel restart
-        self.update_env({'PYDEVD_DISABLE_FILE_VALIDATION': '1'})
+        self.update_env(env={'PYDEVD_DISABLE_FILE_VALIDATION': '1'})
 
         cmd = super().format_kernel_cmd(extra_arguments)
         # Replace the `ipykernel_launcher` with `spyder_kernel.console`
