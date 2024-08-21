@@ -2,11 +2,16 @@ from jupyter_server.services.kernels.kernelmanager import (
     AsyncMappingKernelManager,
 )
 from jupyter_server._tz import isoformat
+from traitlets import Unicode
 
 
 
 class SpyderAsyncMappingKernelManager(AsyncMappingKernelManager):
     kernel_manager_class = 'spyder_remote_services.jupyter_client.manager.SpyderAsyncIOLoopKernelManager'
+
+    default_kernel_name = Unicode(
+        'spyder-kernel', help='The name of the default kernel to start'
+    ).tag(config=True)
 
     def kernel_model(self, kernel_id):
         """Return a JSON-safe dict representing a kernel
