@@ -7,8 +7,8 @@ license = { file = "LICENSE.txt" }
 dynamic = ["version"]
 requires-python = ">=3.10"
 dependencies = [
-    "jupyter_server >=1.24.0,<2.0",
-    "jupyter_client >=8.6.1,<9.0",
+    "jupyter_server >=2.14.2,<3.0",
+    "jupyter_client >=8.6.2,<9.0",
 ]
 
 [tool.setuptools.dynamic]
