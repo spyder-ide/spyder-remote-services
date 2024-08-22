@@ -33,6 +33,7 @@ function get_enviroment_name {
 # Variables
 PACKAGE_NAME="spyder-remote-services"
 VERSION=${1:-latest}
+KERNEL_VERSION=${2:-latest}
 
 SERVER_ENV="spyder-remote"
 KERNEL_ENV="spyder-kernel"
@@ -95,6 +96,12 @@ fi
 
 
 # Install spyder-kernel
-micromamba create -y -n $KERNEL_ENV -c conda-forge -c conda-forge/label/spyder_kernels_rc "python=${PYTHON_VERSION}" spyder-kernels
+if [ $KERNEL_VERSION == "latest" ]; then
+  micromamba create -y -n $KERNEL_ENV -c conda-forge -c conda-forge/label/spyder_kernels_rc "python=${PYTHON_VERSION}" spyder-kernels
+elif [[ $KERNEL_VERSION != *"="* ]] && [[ $KERNEL_VERSION != *">="* ]] && [[ $KERNEL_VERSION != *"<="* ]] && [[ $KERNEL_VERSION != *">"* ]] && [[ $KERNEL_VERSION != *"<"* ]]; then
+  micromamba create -y -n $KERNEL_ENV -c conda-forge -c conda-forge/label/spyder_kernels_rc "python=${PYTHON_VERSION}" "spyder-kernels=$KERNEL_VERSION"
+else
+  micromamba create -y -n $KERNEL_ENV -c conda-forge -c conda-forge/label/spyder_kernels_rc "python=${PYTHON_VERSION}" "spyder-kernels${KERNEL_VERSION}"
+fi
 
 micromamba run -n $KERNEL_ENV python -m ipykernel install --user --name $KERNEL_ENV
