@@ -1,4 +1,18 @@
-#!/bin/bash
+#!/bin/sh
+
+# Detect the shell from which the script was called
+parent=$(ps -o comm $PPID |tail -1)
+parent=${parent#-}  # remove the leading dash that login shells have
+case "$parent" in
+  # shells supported
+  bash|fish|xonsh|zsh)
+    shell=$parent
+    ;;
+  *)
+    # use the login shell (basename of $SHELL) as a fallback
+    shell=${SHELL##*/}
+    ;;
+esac
 
 function download {
   if hash curl >/dev/null 2>&1; then
@@ -65,7 +79,7 @@ mkdir -p "${BIN_FOLDER}"
 download "${RELEASE_URL}" "${BIN_FOLDER}/micromamba"
 chmod +x "${BIN_FOLDER}/micromamba"
 
-eval "$("${BIN_FOLDER}/micromamba" shell hook --shell bash)"
+eval "$("${BIN_FOLDER}/micromamba" shell hook --shell ${shell})"
 
 
 # Install spyder-remote-services
