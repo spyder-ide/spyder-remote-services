@@ -88,7 +88,7 @@ class SpyderRemoteServices(ExtensionApp):
     """A simple jupyter server application."""
 
     # The name of the extension.
-    name = "spyder_remote_services"
+    name = "spyder-services"
 
     open_browser = False
 
