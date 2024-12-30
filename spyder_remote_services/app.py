@@ -100,7 +100,7 @@ class SpyderRemoteServices(ExtensionApp):
 
     def initialize_handlers(self):
         """Initialize handlers."""
-        self.handlers.extend(handlers)
+        self.handlers.extend([(rf"/{self.name}{h[0]}", h[1]) for h in handlers])
 
     def initialize(self):
         super().initialize()
