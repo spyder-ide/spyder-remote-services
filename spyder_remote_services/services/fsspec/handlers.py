@@ -4,11 +4,10 @@ import orjson
 from jupyter_server.auth.decorator import ws_authenticated, authorized
 from jupyter_server.base.handlers import JupyterHandler
 from jupyter_server.base.websocket import WebSocketMixin
-from tornado.websocket import WebSocketHandler
 from tornado import web
 
 from spyder_remote_services.services.fsspec.mixin import (
-    FSSpecWebSocketMixin,
+    FileOpenWebSocketHandler,
     FSSpecRESTMixin,
 )
 
@@ -17,8 +16,7 @@ _logger = logging.getLogger(__name__)
 
 
 class ReadWriteWebsocketHandler(WebSocketMixin,
-                                FSSpecWebSocketMixin,
-                                WebSocketHandler,
+                                FileOpenWebSocketHandler,
                                 JupyterHandler):
     auth_resource = "spyder-services"
 

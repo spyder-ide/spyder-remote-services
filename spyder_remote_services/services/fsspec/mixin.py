@@ -1,240 +1,229 @@
 from __future__ import annotations
+import asyncio
 import base64
 import datetime
+from http import HTTPStatus
 import logging
 import os
 from pathlib import Path
 import stat
+import sys
+import threading
+import time
 import traceback
 
 import orjson
+from tornado.websocket import WebSocketHandler
 
 
-CHUNK_SIZE = 2**20  # 1 MB per chunk, adjust as needed
 _logger = logging.getLogger(__name__)
 
 
-class FSSpecWebSocketMixin:
+class FileOpenWebSocketHandler(WebSocketHandler):
     """
-    WebSocket handler for *only* read/write file operations in a chunked,
-    fsspec-like manner.
+    WebSocket handler for opening files and streaming data.
 
-    Supports:
-      - cat_file(start=None, end=None)
-      - read_block(offset, length, delimiter=None)
-      - write_file() in streamed chunks (client sends many base64-encoded "data" messages).
-
-    The protocol on the wire (JSON messages):
+    The protocol on message receive (JSON messages):
       {
-        "method": "cat_file",   # or "read_block", "write_file"
-        "args": [...],
-        "kwargs": {...}
+        "method": "read", # "write", "seek", etc.  (required)
+        "kwargs": {...},  (optional)
+        "data": "<base64-encoded chunk>",  # all data is base64-encoded  (optional)
       }
 
-    For reading, the server will respond with multiple JSON messages:
+    The protocol for sending data back to the client:
       {
-        "type": "data",
-        "data": "<base64-encoded chunk>"
+        "status": 200,  # HTTP status code  (required)
+        "data": "<base64-encoded chunk>",  # response data if any  (optional)
+        "error": {"message": "error message",  (required)
+                  "traceback": ["line1", "line2", ...]  (optional)}  # if an error occurred  (optional)
       }
-      ...
-      {
-        "type": "eof"
-      }
-
-    For writing, the client sends multiple "data" messages to the server,
-    then "eof" to finalize.
     """
+
+    LOCK_TIMEOUT = 100  # seconds
+
+    max_message_size = 5 * 1024 * 1024 * 1024  # 5 GB
+
+    __thread_lock = threading.Lock()
 
     # ----------------------------------------------------------------
     # Tornado WebSocket / Handler Hooks
     # ----------------------------------------------------------------
+    async def open(self, path,
+                   mode="r", lock=None, atomic=False):
+        """Open file."""
+        self.path = self._load_path(path)
+        self.atomic = atomic
+
+        if lock and not await self._acquire_lock(path):
+            self.close(1002, "Failed to acquire lock.")
+            return
+
+        if self.atomic:
+            self.file = self.atomic_path.open(mode)
+        else:
+            self.file = self.path.open(mode)
+
+    async def on_close(self):
+        """Close file."""
+        self.file.close()
+        if self.atomic:
+            self.atomic_path.replace(self.path)
+        if self.__locked:
+            self._release_lock()
+
     async def on_message(self, raw_message):
+        """Handle incoming messages."""
+        try:
+            await self.handle_message(raw_message)
+        except Exception as e:
+            _logger.exception("Error handling message")
+            await self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR,
+                                   f"Error handling message {e}",
+                                   exec_info=e)
+
+    async def handle_message(self, raw_message):
         """Handle incoming JSON messages (read/write commands only)."""
         msg = await self._decode_json(raw_message)
         if not msg:
             return
 
         method = msg.get("method")
-        args = msg.get("args", [])
         kwargs = msg.get("kwargs", {})
+        data = msg.get("data")
 
         if not method:
-            await self._send_error("No 'method' provided.")
+            await self._send_error(HTTPStatus.BAD_REQUEST,
+                                   "No 'method' provided.")
             return
 
         # Lookup
         func = getattr(self, f"_handle_{method}", None)
         if func is None:
-            await self._send_error(f"Unknown or unsupported method: {method}")
+            await self._send_error(
+                HTTPStatus.NOT_FOUND,
+                f"Unknown or unsupported method: {method}"
+                )
             return
 
+        if data:
+            kwargs["data"] = base64.b64decode(data)
+
         try:
-            await func(*args, **kwargs)
+            value = await func(**kwargs)
         except Exception as e:
             _logger.exception("Error in method '%s':", method)
             await self._send_error(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
                 f"Error in method '{method}': {e}",
-                traceback=traceback.format_exception(type(e), e, e.__traceback__),
+                exec_info=e,
             )
+
+        await self._send_json(status=HTTPStatus.OK, value=value)
 
     # ----------------------------------------------------------------
     # Internal Helpers
     # ----------------------------------------------------------------
+    async def _acquire_lock(self, __start_time=None):
+        """Acquire a lock on the file."""
+        if __start_time is None:
+            __start_time = time.time()
+
+        while self.__locked:
+            await asyncio.sleep(1)
+            if time.time() - __start_time > self.LOCK_TIMEOUT:
+                return False
+
+        with self.__thread_lock:
+            if self.__locked:
+                return await self._acquire_lock(__start_time=__start_time)
+            self.lock_path.touch(exist_ok=False)
+
+        return True
+
+    def _release_lock(self):
+        """Release the lock on the file."""
+        with self.__thread_lock:
+            self.lock_path.unlink(missing_ok=True)
+
+    @property
+    def atomic_path(self):
+        """Get the path to the atomic file."""
+        return self.path.parent / f".{self.path.name}.spyder.tmp"
+
+    @property
+    def lock_path(self):
+        """Get the path to the atomic file."""
+        return self.path.parent / f".{self.path.name}.spyder.lck"
+
+    @property
+    def __locked(self):
+        return Path(self.lock_path).exists()
+
     async def _decode_json(self, raw_message):
         """Decode a JSON message (non-streamed)."""
         try:
             return orjson.loads(raw_message)
         except orjson.JSONDecodeError:
             _logger.exception("Invalid JSON: %s", raw_message)
-            await self._send_error(f"Invalid JSON: {raw_message}")
+            await self._send_error(HTTPStatus.BAD_REQUEST,
+                                   f"Invalid JSON: {raw_message}")
             return None
 
-    async def _send_json(self, data: dict):
+    async def _send_json(self, status: HTTPStatus, data: dict):
         """Send a single JSON message."""
-        await self.write_message(orjson.dumps(data))
+        await self.write_message(orjson.dumps(
+            {"status": status.value, **data}
+        ))
 
-    async def _send_error(self, error_msg: str, traceback: list[str] | None = None):
+    async def _send_error(self,
+                          status: HTTPStatus,
+                          error_msg: str,
+                          exec_info: bool |
+                                     BaseException |
+                                     tuple |
+                                     None = None):
         """Send an error response to the client."""
-        data = {"error": error_msg}
-        if traceback:
-            data["traceback"] = traceback
-        await self._send_json(data)
-
-    async def _send_stream_chunk(self, chunk: bytes):
-        """Send a chunk of bytes as a base64-encoded message."""
-        encoded = base64.b64encode(chunk).decode()
-        await self._send_json({"type": "data", "data": encoded})
-
-    async def _send_stream_eof(self):
-        """Signal the end of a data stream."""
-        await self._send_json({"type": "eof"})
+        data = {"message": error_msg}
+        if exec_info:
+            if isinstance(exec_info, BaseException):
+                data["traceback"] = traceback.format_exception(
+                    type(exec_info), exec_info, exec_info.__traceback__)
+            elif isinstance(exec_info, tuple):
+                data["traceback"] = traceback.format_exception(*exec_info)
+            else:
+                data["traceback"] = traceback.format_exception(*sys.exc_info())
+        await self._send_json(status=status, data={"error": data})
 
     def _load_path(self, path_str: str) -> Path:
         """Convert path string to a Path object."""
         return Path(path_str)
 
     # ----------------------------------------------------------------
-    # Read Operations
-    # ----------------------------------------------------------------
-    async def _handle_cat_file(self, path, start=None, end=None, **kwargs):
-        """
-        Read the entire file (or partial range) in base64 chunks.
-
-        Equivalent to fsspec cat_file(path, start, end).
-        """
-        path_obj = self._load_path(path)
-        if not path_obj.exists() or not path_obj.is_file():
-            await self._send_error(f"File not found or not a file: {path}")
-            return
-
-        size = path_obj.stat().st_size
-        start = max(0, start if start else 0)
-        end = min(size, end if end is not None else size)
-
-        await self._stream_file(path_obj, start, end)
-
-    async def _handle_read_block(self, fn, offset, length, delimiter=None):
-        """
-        Like fsspec read_block(fn, offset, length, delimiter).
-
-        Read partial bytes from the file, possibly adjusted to the next delimiter boundary.
-        """
-        path = self._load_path(fn)
-        if not path.exists() or not path.is_file():
-            await self._send_error(f"File not found or not a file: {fn}")
-            return
-
-        size = path.stat().st_size
-        offset = max(0, offset)
-        end = size if length is None else min(size, offset + length)
-
-        # If a delimiter is given, read until found
-        if delimiter is not None:
-            with path.open("rb") as f:
-                f.seek(offset)
-                chunk = f.read((end - offset) + 65536)  # read a bit extra
-            idx = chunk.find(delimiter, -65536)
-            if idx != -1:
-                # include up through the delimiter
-                end = offset + idx + len(delimiter)
-
-        await self._stream_file(path, offset, end)
-
-    async def _stream_file(self, path: Path, start: int, end: int):
-        """Read [start:end] from `path` in chunked fashion and send to client."""
-        if end < start:
-            await self._send_error(f"Invalid range: start={start} > end={end}")
-            return
-
-        with path.open("rb") as f:
-            f.seek(start)
-            remaining = end - start
-            while remaining > 0:
-                to_read = min(CHUNK_SIZE, remaining)
-                chunk = f.read(to_read)
-                if not chunk:
-                    break
-                await self._send_stream_chunk(chunk)
-                remaining -= len(chunk)
-
-        await self._send_stream_eof()
-
-    # ----------------------------------------------------------------
     # Write Operation
     # ----------------------------------------------------------------
-    async def _handle_write_file(self, path):
-        """
-        Write a file in chunks.
+    async def _handle_write(self, data: bytes | str) -> int:
+        """Write data to the file."""
+        return self.file.write(data)
 
-        Protocol for writing:
-        1) Client sends {"method": "write_file", "args": ["some/path"], "kwargs": {}}
-        2) Then the client sends multiple data messages, e.g.:
-           {"type": "data", "data": "<base64_chunk>"}
-           ...
-        3) Finally the client sends {"type": "eof"}
-        4) Server writes out a response: {"type": "write_complete"} or success JSON
+    async def _handle_flush(self):
+        """Flush the file."""
+        return self.file.flush()
 
-        open the file in 'wb' and keep appending as 'data' messages is received.
-        """
-        path_obj = self._load_path(path)
+    async def _handle_read(self, n: int = -1) -> bytes | str:
+        """Read data from the file."""
+        return self.file.read(n)
 
-        f = path_obj.open("wb")
+    async def _handle_seek(self, offset: int, whence: int = 0) -> int:
+        """Seek to a new position in the file."""
+        return self.file.seek(offset, whence)
 
-        try:
-            while True:
-                message = await self.read_message()
-                if message is None:
-                    # The client disconnected?
-                    _logger.warning("Client disconnected during write_file.")
-                    break
+    async def _handle_tell(self) -> int:
+        """Get the current file position."""
+        return self.file.tell()
 
-                msg = await self._decode_json(message)
-                if not msg:
-                    continue
-
-                msg_type = msg.get("type")
-                if msg_type == "data":
-                    # Base64 decode the chunk
-                    b64data = msg.get("data", "")
-                    chunk = base64.b64decode(b64data)
-                    f.write(chunk)
-                elif msg_type == "eof":
-                    # Done receiving
-                    break
-                else:
-                    await self._send_error(
-                        f"Unexpected message type during write_file: {msg_type}"
-                    )
-                    break
-
-        except Exception as e:
-            _logger.exception("Error while writing file: %s", path)
-            await self._send_error(f"Error while writing file: {e}")
-        finally:
-            f.close()
-
-        # Send final response
-        await self._send_json({"type": "write_complete", "path": str(path_obj)})
+    async def _handle_truncate(self, size: int | None = None) -> int:
+        """Truncate the file to a new size."""
+        return self.file.truncate(size)
 
 
 class FSSpecRESTMixin:
