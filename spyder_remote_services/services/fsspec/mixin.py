@@ -48,31 +48,41 @@ class FileOpenWebSocketHandler(WebSocketHandler):
     # ----------------------------------------------------------------
     # Tornado WebSocket / Handler Hooks
     # ----------------------------------------------------------------
-    async def open(self, path,
-                   mode="r", lock=None, atomic=False):
+    async def open(self, path):
         """Open file."""
-        self.path = self._load_path(path)
-        self.atomic = atomic
+        mode = self.get_argument("mode", default="r")
+        self.atomic = self.get_argument("atomic", default="false") == "true"
+        lock = self.get_argument("lock", default="false") == "true"
 
-        if lock and not await self._acquire_lock(path):
-            self.close(1002, "Failed to acquire lock.")
+        self.file = None
+        try:
+            self.path = self._load_path(path)
+
+            if lock and not await self._acquire_lock(path):
+                self.close(1002, "Failed to acquire lock.")
+                return
+
+            if self.atomic:
+                self.file = self.atomic_path.open(mode)
+            else:
+                self.file = self.path.open(mode)
+        except Exception as e:
+            _logger.exception("Failed to open file: %s", self.path)
+            self.close(1002, f"Failed to open file: {e}")
             return
 
-        if self.atomic:
-            self.file = self.atomic_path.open(mode)
-        else:
-            self.file = self.path.open(mode)
-
-    async def on_close(self):
+    def on_close(self):
         """Close file."""
-        self.file.close()
-        if self.atomic:
-            self.atomic_path.replace(self.path)
+        if self.file is not None:
+            self.file.close()
+            if self.atomic:
+                self.atomic_path.replace(self.path)
         if self.__locked:
             self._release_lock()
 
     async def on_message(self, raw_message):
         """Handle incoming messages."""
+        _logger.debug("Received message: %s", raw_message)
         try:
             await self.handle_message(raw_message)
         except Exception as e:
@@ -87,42 +97,47 @@ class FileOpenWebSocketHandler(WebSocketHandler):
         if not msg:
             return
 
-        method = msg.get("method")
-        kwargs = msg.get("kwargs", {})
-        data = msg.get("data")
-
-        if not method:
-            await self._send_error(HTTPStatus.BAD_REQUEST,
-                                   "No 'method' provided.")
+        method, kwargs = await self._parse_message(msg)
+        if method is None:
             return
 
-        # Lookup
-        func = getattr(self, f"_handle_{method}", None)
-        if func is None:
-            await self._send_error(
-                HTTPStatus.NOT_FOUND,
-                f"Unknown or unsupported method: {method}"
-                )
-            return
-
-        if data:
-            kwargs["data"] = base64.b64decode(data)
-
-        try:
-            value = await func(**kwargs)
-        except Exception as e:
-            _logger.exception("Error in method '%s':", method)
-            await self._send_error(
-                HTTPStatus.INTERNAL_SERVER_ERROR,
-                f"Error in method '{method}': {e}",
-                exec_info=e,
-            )
-
-        await self._send_json(status=HTTPStatus.OK, value=value)
+        await self._run_method(method, kwargs)
 
     # ----------------------------------------------------------------
     # Internal Helpers
     # ----------------------------------------------------------------
+    async def _run_method(self, method, kwargs):
+        """Run a method with kwargs."""
+        try:
+            result = await getattr(self, f"_handle_{method}")(**kwargs)
+        except AttributeError as e:
+            _logger.exception("Invalid method: %s", method)
+            await self._send_error(HTTPStatus.BAD_REQUEST,
+                                   f"Invalid method: {method}",
+                                   exec_info=e)
+        except Exception as e:
+            _logger.exception("Error handling method: %s", method)
+            await self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR,
+                                   f"Error handling method {method}",
+                                   exec_info=e)
+        else:
+            if result is not None:
+                await self._send_json(HTTPStatus.OK, data=result)
+            else:
+                await self._send_json(HTTPStatus.NO_CONTENT)
+
+    async def _parse_message(self, msg):
+        """Parse a message into method and kwargs."""
+        method = msg.pop("method", None)
+        if not method:
+            await self._send_error(HTTPStatus.BAD_REQUEST, "Missing 'method' key")
+            return None, {}
+
+        if "data" in msg:
+            msg["data"] = base64.b64decode(msg["data"])
+
+        return method, msg
+
     async def _acquire_lock(self, __start_time=None):
         """Acquire a lock on the file."""
         if __start_time is None:
@@ -169,7 +184,7 @@ class FileOpenWebSocketHandler(WebSocketHandler):
                                    f"Invalid JSON: {raw_message}")
             return None
 
-    async def _send_json(self, status: HTTPStatus, data: dict):
+    async def _send_json(self, status: HTTPStatus, **data: dict):
         """Send a single JSON message."""
         await self.write_message(orjson.dumps(
             {"status": status.value, **data}
@@ -192,7 +207,7 @@ class FileOpenWebSocketHandler(WebSocketHandler):
                 data["traceback"] = traceback.format_exception(*exec_info)
             else:
                 data["traceback"] = traceback.format_exception(*sys.exc_info())
-        await self._send_json(status=status, data={"error": data})
+        await self._send_json(status=status, error=data)
 
     def _load_path(self, path_str: str) -> Path:
         """Convert path string to a Path object."""
