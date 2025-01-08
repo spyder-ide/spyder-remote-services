@@ -21,9 +21,9 @@ class ReadWriteWebsocketHandler(WebSocketMixin,
     auth_resource = "spyder-services"
 
     @ws_authenticated
-    async def get(self):
+    async def get(self, *args, **kwargs):
         """Handle the initial websocket upgrade GET request."""
-        await super().get()
+        await super().get(*args, **kwargs)
 
 
 class BaseFSSpecHandler(FSSpecRESTMixin, JupyterHandler):
@@ -49,8 +49,7 @@ class LsHandler(BaseFSSpecHandler):
 
     @web.authenticated
     @authorized
-    def get(self):
-        path = self.get_argument("path", default=None)
+    def get(self, path):
         if not path:
             self.write_json({"error": "Missing 'path' parameter"}, status=400)
             return
@@ -75,8 +74,7 @@ class InfoHandler(BaseFSSpecHandler):
 
     @web.authenticated
     @authorized
-    def get(self):
-        path = self.get_argument("path", default=None)
+    def get(self, path):
         if not path:
             self.write_json({"error": "Missing 'path' parameter"}, status=400)
             return
@@ -98,8 +96,7 @@ class ExistsHandler(BaseFSSpecHandler):
 
     @web.authenticated
     @authorized
-    def get(self):
-        path = self.get_argument("path", default=None)
+    def get(self, path):
         if not path:
             self.write_json({"error": "Missing 'path' parameter"}, status=400)
             return
@@ -119,8 +116,7 @@ class IsFileHandler(BaseFSSpecHandler):
 
     @web.authenticated
     @authorized
-    def get(self):
-        path = self.get_argument("path", default=None)
+    def get(self, path):
         if not path:
             self.write_json({"error": "Missing 'path' parameter"}, status=400)
             return
@@ -140,8 +136,7 @@ class IsDirHandler(BaseFSSpecHandler):
 
     @web.authenticated
     @authorized
-    def get(self):
-        path = self.get_argument("path", default=None)
+    def get(self, path):
         if not path:
             self.write_json({"error": "Missing 'path' parameter"}, status=400)
             return
@@ -162,8 +157,7 @@ class MkdirHandler(BaseFSSpecHandler):
 
     @web.authenticated
     @authorized
-    def post(self):
-        path = self.get_argument("path", default=None)
+    def post(self, path):
         if not path:
             self.write_json({"error": "Missing 'path' parameter"}, status=400)
             return
@@ -186,8 +180,7 @@ class RmdirHandler(BaseFSSpecHandler):
 
     @web.authenticated
     @authorized
-    def delete(self):
-        path = self.get_argument("path", default=None)
+    def delete(self, path):
         if not path:
             self.write_json({"error": "Missing 'path' parameter"}, status=400)
             return
@@ -212,8 +205,7 @@ class RemoveFileHandler(BaseFSSpecHandler):
 
     @web.authenticated
     @authorized
-    def delete(self):
-        path = self.get_argument("path", default=None)
+    def delete(self, path):
         if not path:
             self.write_json({"error": "Missing 'path' parameter"}, status=400)
             return
@@ -234,8 +226,7 @@ class TouchHandler(BaseFSSpecHandler):
 
     @web.authenticated
     @authorized
-    def post(self):
-        path = self.get_argument("path", default=None)
+    def post(self, path):
         if not path:
             self.write_json({"error": "Missing 'path' parameter"}, status=400)
             return
@@ -249,16 +240,17 @@ class TouchHandler(BaseFSSpecHandler):
             self.write_json({"error": str(e)}, status=500)
 
 
+_path_regex = r"file://(?P<path>.+)"
 
 handlers = [
-    (r"/fsspec/ws", ReadWriteWebsocketHandler),  # WebSocket
-    (r"/fsspec/ls", LsHandler),                  # GET
-    (r"/fsspec/info", InfoHandler),              # GET
-    (r"/fsspec/exists", ExistsHandler),          # GET
-    (r"/fsspec/isfile", IsFileHandler),          # GET
-    (r"/fsspec/isdir", IsDirHandler),            # GET
-    (r"/fsspec/mkdir", MkdirHandler),            # POST
-    (r"/fsspec/rmdir", RmdirHandler),            # DELETE
-    (r"/fsspec/file", RemoveFileHandler),        # DELETE
-    (r"/fsspec/touch", TouchHandler),            # POST
+    (rf"/fsspec/open/{_path_regex}", ReadWriteWebsocketHandler),  # WebSocket
+    (rf"/fsspec/ls/{_path_regex}", LsHandler),                  # GET
+    (rf"/fsspec/info/{_path_regex}", InfoHandler),              # GET
+    (rf"/fsspec/exists/{_path_regex}", ExistsHandler),          # GET
+    (rf"/fsspec/isfile/{_path_regex}", IsFileHandler),          # GET
+    (rf"/fsspec/isdir/{_path_regex}", IsDirHandler),            # GET
+    (rf"/fsspec/mkdir/{_path_regex}", MkdirHandler),            # POST
+    (rf"/fsspec/rmdir/{_path_regex}", RmdirHandler),            # DELETE
+    (rf"/fsspec/file/{_path_regex}", RemoveFileHandler),        # DELETE
+    (rf"/fsspec/touch/{_path_regex}", TouchHandler),            # POST
 ]
