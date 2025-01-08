@@ -6,6 +6,7 @@ from http import HTTPStatus
 import logging
 import os
 from pathlib import Path
+from shutil import copy2, copystat
 import stat
 import sys
 import threading
@@ -50,9 +51,10 @@ class FileOpenWebSocketHandler(WebSocketHandler):
     # ----------------------------------------------------------------
     async def open(self, path):
         """Open file."""
-        mode = self.get_argument("mode", default="r")
+        self.mode = self.get_argument("mode", default="r")
         self.atomic = self.get_argument("atomic", default="false") == "true"
         lock = self.get_argument("lock", default="false") == "true"
+        self.encoding = self.get_argument("encoding", default="utf-8")
 
         self.file = None
         try:
@@ -62,10 +64,7 @@ class FileOpenWebSocketHandler(WebSocketHandler):
                 self.close(1002, "Failed to acquire lock.")
                 return
 
-            if self.atomic:
-                self.file = self.atomic_path.open(mode)
-            else:
-                self.file = self.path.open(mode)
+            self.file = await self._open_file()
         except Exception as e:
             _logger.exception("Failed to open file: %s", self.path)
             self.close(1002, f"Failed to open file: {e}")
@@ -74,9 +73,7 @@ class FileOpenWebSocketHandler(WebSocketHandler):
     def on_close(self):
         """Close file."""
         if self.file is not None:
-            self.file.close()
-            if self.atomic:
-                self.atomic_path.replace(self.path)
+            self._close_file()
         if self.__locked:
             self._release_lock()
 
@@ -106,6 +103,23 @@ class FileOpenWebSocketHandler(WebSocketHandler):
     # ----------------------------------------------------------------
     # Internal Helpers
     # ----------------------------------------------------------------
+    async def _open_file(self):
+        """Open the file in the requested mode."""
+        if self.atomic and ("+" in self.mode or
+                            "a" in self.mode or
+                            "w" in self.mode):
+            if self.path.exists() and "w" not in self.mode:
+                copy2(self.path, self.atomic_path)
+                copystat(self.path, self.atomic_path)
+            return self.atomic_path.open(self.mode)
+
+        return self.path.open(self.mode)
+
+    def _close_file(self):
+        self.file.close()
+        if self.atomic:
+            self.atomic_path.replace(self.path)
+
     async def _run_method(self, method, kwargs):
         """Run a method with kwargs."""
         try:
@@ -133,7 +147,9 @@ class FileOpenWebSocketHandler(WebSocketHandler):
             await self._send_error(HTTPStatus.BAD_REQUEST, "Missing 'method' key")
             return None, {}
 
-        if "data" in msg:
+        if "data" in msg and "b" not in self.mode:
+            msg["data"] = base64.b64decode(msg["data"]).decode(self.encoding)
+        elif "data" in msg:
             msg["data"] = base64.b64decode(msg["data"])
 
         return method, msg
