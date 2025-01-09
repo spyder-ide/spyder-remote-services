@@ -4,7 +4,7 @@ from typing import Any
 import traceback
 
 from jupyter_server.auth.decorator import authorized, ws_authenticated
-from jupyter_server.base.handlers import APIHandler
+from jupyter_server.base.handlers import JupyterHandler
 from jupyter_server.base.websocket import WebSocketMixin
 import orjson
 from tornado import web
@@ -17,7 +17,7 @@ from spyder_remote_services.services.fsspec.mixin import (
 
 class ReadWriteWebsocketHandler(WebSocketMixin,
                                 FileOpenWebSocketHandler,
-                                APIHandler):
+                                JupyterHandler):
     auth_resource = "spyder-services"
 
     @ws_authenticated
@@ -26,7 +26,7 @@ class ReadWriteWebsocketHandler(WebSocketMixin,
         await super().get(*args, **kwargs)
 
 
-class BaseFSSpecHandler(FSSpecRESTMixin, APIHandler):
+class BaseFSSpecHandler(FSSpecRESTMixin, JupyterHandler):
     auth_resource = "spyder-services"
 
     def write_json(self, data, status=200):
