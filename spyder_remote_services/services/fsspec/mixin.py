@@ -3,21 +3,17 @@ import asyncio
 import base64
 import datetime
 from http import HTTPStatus
-import logging
 import os
 from pathlib import Path
 from shutil import copy2, copystat
 import stat
-import sys
 import threading
 import time
 import traceback
+from io import FileIO
 
 import orjson
 from tornado.websocket import WebSocketHandler
-
-
-_logger = logging.getLogger(__name__)
 
 
 class FileOpenWebSocketHandler(WebSocketHandler):
@@ -56,19 +52,24 @@ class FileOpenWebSocketHandler(WebSocketHandler):
         lock = self.get_argument("lock", default="false") == "true"
         self.encoding = self.get_argument("encoding", default="utf-8")
 
-        self.file = None
+        self.file: FileIO = None
         try:
             self.path = self._load_path(path)
 
             if lock and not await self._acquire_lock(path):
-                self.close(1002, "Failed to acquire lock.")
+                self.close(1002, self._parse_json(HTTPStatus.LOCKED,
+                                                  message="File is locked"))
                 return
 
             self.file = await self._open_file()
+        except OSError as e:
+            self.log.warning("Error opening file", exc_info=e)
+            self.close(1002, self._parse_os_error(e))
         except Exception as e:
-            _logger.exception("Failed to open file: %s", self.path)
-            self.close(1002, f"Failed to open file: {e}")
-            return
+            self.log.exception("Error opening file")
+            self.close(1002, self._parse_error(e))
+        else:
+            await self._send_json(HTTPStatus.OK)
 
     def on_close(self):
         """Close file."""
@@ -79,30 +80,24 @@ class FileOpenWebSocketHandler(WebSocketHandler):
 
     async def on_message(self, raw_message):
         """Handle incoming messages."""
-        _logger.debug("Received message: %s", raw_message)
+        self.log.debug("Received message: %s", raw_message)
         try:
             await self.handle_message(raw_message)
         except Exception as e:
-            _logger.exception("Error handling message")
-            await self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR,
-                                   f"Error handling message {e}",
-                                   exec_info=e)
-
-    async def handle_message(self, raw_message):
-        """Handle incoming JSON messages (read/write commands only)."""
-        msg = await self._decode_json(raw_message)
-        if not msg:
-            return
-
-        method, kwargs = await self._parse_message(msg)
-        if method is None:
-            return
-
-        await self._run_method(method, kwargs)
+            self.log.exception("Error handling message")
+            await self.write_message(self._parse_error(e), binary=True)
 
     # ----------------------------------------------------------------
     # Internal Helpers
     # ----------------------------------------------------------------
+    async def handle_message(self, raw_message):
+        """Handle incoming JSON messages (read/write commands only)."""
+        msg = self._decode_json(raw_message)
+
+        method, kwargs = await self._parse_message(msg)
+
+        await self._run_method(method, kwargs)
+
     async def _open_file(self):
         """Open the file in the requested mode."""
         if self.atomic and ("+" in self.mode or
@@ -124,33 +119,20 @@ class FileOpenWebSocketHandler(WebSocketHandler):
         """Run a method with kwargs."""
         try:
             result = await getattr(self, f"_handle_{method}")(**kwargs)
-        except AttributeError as e:
-            _logger.exception("Invalid method: %s", method)
-            await self._send_error(HTTPStatus.BAD_REQUEST,
-                                   f"Invalid method: {method}",
-                                   exec_info=e)
-        except Exception as e:
-            _logger.exception("Error handling method: %s", method)
-            await self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR,
-                                   f"Error handling method {method}",
-                                   exec_info=e)
+        except OSError as e:
+            self.log.warning("Error handling method: %s", method)
+            await self.write_message(self._parse_os_error(e), binary=True)
         else:
-            if result is not None:
-                await self._send_json(HTTPStatus.OK, data=result)
-            else:
-                await self._send_json(HTTPStatus.NO_CONTENT)
+            await self._send_result(result)
 
     async def _parse_message(self, msg):
         """Parse a message into method and kwargs."""
         method = msg.pop("method", None)
-        if not method:
-            await self._send_error(HTTPStatus.BAD_REQUEST, "Missing 'method' key")
-            return None, {}
 
-        if "data" in msg and "b" not in self.mode:
-            msg["data"] = base64.b64decode(msg["data"]).decode(self.encoding)
+        if "data" in msg and isinstance(msg["data"], list):
+            msg["data"] = [self._decode_data(d) for d in msg["data"]]
         elif "data" in msg:
-            msg["data"] = base64.b64decode(msg["data"])
+            msg["data"] = self._decode_data(msg["data"])
 
         return method, msg
 
@@ -190,47 +172,71 @@ class FileOpenWebSocketHandler(WebSocketHandler):
     def __locked(self):
         return Path(self.lock_path).exists()
 
-    async def _decode_json(self, raw_message):
+    def _decode_json(self, raw_message):
         """Decode a JSON message (non-streamed)."""
-        try:
-            return orjson.loads(raw_message)
-        except orjson.JSONDecodeError:
-            _logger.exception("Invalid JSON: %s", raw_message)
-            await self._send_error(HTTPStatus.BAD_REQUEST,
-                                   f"Invalid JSON: {raw_message}")
-            return None
+        return orjson.loads(raw_message)
 
     async def _send_json(self, status: HTTPStatus, **data: dict):
         """Send a single JSON message."""
-        await self.write_message(orjson.dumps(
-            {"status": status.value, **data}
-        ))
+        await self.write_message(self._parse_json(status, **data), binary=True)
 
-    async def _send_error(self,
-                          status: HTTPStatus,
-                          error_msg: str,
-                          exec_info: bool |
-                                     BaseException |
-                                     tuple |
-                                     None = None):
-        """Send an error response to the client."""
-        data = {"message": error_msg}
-        if exec_info:
-            if isinstance(exec_info, BaseException):
-                data["traceback"] = traceback.format_exception(
-                    type(exec_info), exec_info, exec_info.__traceback__)
-            elif isinstance(exec_info, tuple):
-                data["traceback"] = traceback.format_exception(*exec_info)
-            else:
-                data["traceback"] = traceback.format_exception(*sys.exc_info())
-        await self._send_json(status=status, error=data)
+    def _parse_json(self, status: HTTPStatus, **data: dict) -> bytes:
+        """Parse a single JSON message."""
+        return orjson.dumps({"status": status.value, **data})
+
+    def _parse_error(self, error: BaseException) -> bytes:
+        """Parse an error response to the client."""
+        return self._parse_json(HTTPStatus.INTERNAL_SERVER_ERROR,
+                                message=str(error),
+                                tracebacks=traceback.format_exception(type(error),
+                                                                     error,
+                                                                     error.__traceback__),
+                                type=type(error).__name__)
+
+    def _parse_os_error(self, e: OSError) -> bytes:
+        """Parse an OSError response to the client."""
+        return self._parse_json(HTTPStatus.EXPECTATION_FAILED,
+                                message=str(e),
+                                errno=e.errno)
+
+    async def _send_msg_error(self, message):
+        await self._send_json(HTTPStatus.BAD_REQUEST,
+                              message=message)
+
+    async def _send_result(self, result):
+        if result is None:
+            await self._send_json(HTTPStatus.NO_CONTENT)
+        elif isinstance(result, list):
+            await self._send_json(HTTPStatus.OK,
+                                  data=[self._encode_data(r) for r in result])
+        else:
+            await self._send_json(HTTPStatus.OK,
+                                  data=self._encode_data(result))
+
+    def _decode_data(self, data: str | object) -> str | bytes | object:
+        """Decode data from a message."""
+        if not isinstance(data, str):
+            return data
+
+        if "b" in self.mode:
+            return base64.b64decode(data)
+
+        return base64.b64decode(data).decode(self.encoding)
+
+    def _encode_data(self, data: bytes | str | object) -> str:
+        """Encode data for a message."""
+        if isinstance(data, bytes):
+            return base64.b64encode(data).decode("ascii")
+        if isinstance(data, str):
+            return base64.b64encode(data.encode(self.encoding)).decode("ascii")
+        return data
 
     def _load_path(self, path_str: str) -> Path:
         """Convert path string to a Path object."""
-        return Path(path_str)
+        return Path(path_str).expanduser()
 
     # ----------------------------------------------------------------
-    # Write Operation
+    # File Operation
     # ----------------------------------------------------------------
     async def _handle_write(self, data: bytes | str) -> int:
         """Write data to the file."""
@@ -255,6 +261,34 @@ class FileOpenWebSocketHandler(WebSocketHandler):
     async def _handle_truncate(self, size: int | None = None) -> int:
         """Truncate the file to a new size."""
         return self.file.truncate(size)
+
+    async def _handle_fileno(self):
+        """Flush the file to disk."""
+        return self.file.fileno()
+
+    async def _handle_readline(self, size: int = -1) -> bytes | str:
+        """Read a line from the file."""
+        return self.file.readline(size)
+
+    async def _handle_readlines(self, hint: int = -1) -> list[bytes | str]:
+        """Read lines from the file."""
+        return self.file.readlines(hint)
+
+    async def _handle_writelines(self, lines: list[bytes | str]):
+        """Write lines to the file."""
+        return self.file.writelines(lines)
+
+    async def _handle_isatty(self) -> bool:
+        """Check if the file is a TTY."""
+        return self.file.isatty()
+
+    async def _handle_readable(self) -> bool:
+        """Check if the file is readable."""
+        return self.file.readable()
+
+    async def _handle_writable(self) -> bool:
+        """Check if the file is writable."""
+        return self.file.writable()
 
 
 class FSSpecRESTMixin:
@@ -306,7 +340,7 @@ class FSSpecRESTMixin:
         try:
             return Path(path_str).expanduser()
         except Exception as e:
-            _logger.exception("Failed to load path: %s", path_str)
+            self.log.exception("Failed to load path: %s", path_str)
             raise e  # Up to the handler to convert to HTTP error.
 
     def fs_ls(self, path_str: str, detail: bool = True):
