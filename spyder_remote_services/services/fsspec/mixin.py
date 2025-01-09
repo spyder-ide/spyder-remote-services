@@ -304,7 +304,7 @@ class FSSpecRESTMixin:
     def _load_path(self, path_str: str) -> Path | None:
         """Convert a path string to a pathlib.Path object safely."""
         try:
-            return Path(path_str)
+            return Path(path_str).expanduser()
         except Exception as e:
             _logger.exception("Failed to load path: %s", path_str)
             raise e  # Up to the handler to convert to HTTP error.
@@ -318,12 +318,12 @@ class FSSpecRESTMixin:
             # fsspec.ls of a file often returns a single entry
             if detail:
                 return [self._info_for_path(path)]
-            else:
-                return [str(path)]
+
+            return [str(path)]
 
         # Otherwise, it's a directory
         results = []
-        for p in path.iterdir():
+        for p in path.glob("*"):
             if detail:
                 results.append(self._info_for_path(p))
             else:
