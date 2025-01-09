@@ -1,9 +1,12 @@
-import logging
+from __future__ import annotations
+from http.client import responses
+from typing import Any
+import traceback
 
-import orjson
-from jupyter_server.auth.decorator import ws_authenticated, authorized
-from jupyter_server.base.handlers import JupyterHandler
+from jupyter_server.auth.decorator import authorized, ws_authenticated
+from jupyter_server.base.handlers import APIHandler
 from jupyter_server.base.websocket import WebSocketMixin
+import orjson
 from tornado import web
 
 from spyder_remote_services.services.fsspec.mixin import (
@@ -12,12 +15,9 @@ from spyder_remote_services.services.fsspec.mixin import (
 )
 
 
-_logger = logging.getLogger(__name__)
-
-
 class ReadWriteWebsocketHandler(WebSocketMixin,
                                 FileOpenWebSocketHandler,
-                                JupyterHandler):
+                                APIHandler):
     auth_resource = "spyder-services"
 
     @ws_authenticated
@@ -26,13 +26,7 @@ class ReadWriteWebsocketHandler(WebSocketMixin,
         await super().get(*args, **kwargs)
 
 
-class BaseFSSpecHandler(FSSpecRESTMixin, JupyterHandler):
-    """
-    Base class combining:
-      - jupyter_server APIHandler
-      - Our REST mixin with fsspec-like operations
-    """
-
+class BaseFSSpecHandler(FSSpecRESTMixin, APIHandler):
     auth_resource = "spyder-services"
 
     def write_json(self, data, status=200):
@@ -40,204 +34,103 @@ class BaseFSSpecHandler(FSSpecRESTMixin, JupyterHandler):
         self.set_header("Content-Type", "application/json")
         self.finish(orjson.dumps(data))
 
+    def write_error(self, status_code, **kwargs):
+        """APIHandler errors are JSON, not human pages."""
+        self.set_header("Content-Type", "application/json")
+        reason = responses.get(status_code, "Unknown HTTP Error")
+        reply: dict[str, Any] = {
+            "message": reason,
+        }
+        exc_info = kwargs.get("exc_info")
+        if exc_info:
+            e = exc_info[1]
+            if isinstance(e, web.HTTPError):
+                reply["message"] = e.log_message or reason
+                reply["reason"] = e.reason
+            else:
+                reply["type"] = type(e).__name__
+                reply["message"] = str(e)
+                reply["traceback"] = traceback.format_exception(*exc_info)
+        self.log.warning("wrote error: %r", reply["message"], exc_info=True)
+        self.finish(orjson.dumps(reply))
 
 class LsHandler(BaseFSSpecHandler):
-    """
-    GET /fsspec/ls?path=...
-    Optional: ?detail=true|false
-    """
-
     @web.authenticated
     @authorized
     def get(self, path):
-        if not path:
-            self.write_json({"error": "Missing 'path' parameter"}, status=400)
-            return
-
         detail_arg = self.get_argument("detail", default="true").lower()
         detail = detail_arg == "true"
-
-        try:
-            result = self.fs_ls(path, detail=detail)
-            self.write_json(result)
-        except FileNotFoundError as e:
-            self.write_json({"error": str(e)}, status=404)
-        except Exception as e:
-            _logger.exception("Error in LsHandler for path=%s", path)
-            self.write_json({"error": str(e)}, status=500)
+        result = self.fs_ls(path, detail=detail)
+        self.write_json(result)
 
 
 class InfoHandler(BaseFSSpecHandler):
-    """
-    GET /fsspec/info?path=...
-    """
-
     @web.authenticated
     @authorized
     def get(self, path):
-        if not path:
-            self.write_json({"error": "Missing 'path' parameter"}, status=400)
-            return
-        try:
-            result = self.fs_info(path)
-            self.write_json(result)
-        except FileNotFoundError as e:
-            self.write_json({"error": str(e)}, status=404)
-        except Exception as e:
-            _logger.exception("Error in InfoHandler for path=%s", path)
-            self.write_json({"error": str(e)}, status=500)
+        result = self.fs_info(path)
+        self.write_json(result)
+
 
 
 class ExistsHandler(BaseFSSpecHandler):
-    """
-    GET /fsspec/exists?path=...
-    Returns: { "exists": true/false }
-    """
-
     @web.authenticated
     @authorized
     def get(self, path):
-        if not path:
-            self.write_json({"error": "Missing 'path' parameter"}, status=400)
-            return
-        try:
-            result = self.fs_exists(path)
-            self.write_json({"exists": result})
-        except Exception as e:
-            _logger.exception("Error in ExistsHandler for path=%s", path)
-            self.write_json({"error": str(e)}, status=500)
+        result = self.fs_exists(path)
+        self.write_json({"exists": result})
 
 
 class IsFileHandler(BaseFSSpecHandler):
-    """
-    GET /fsspec/isfile?path=...
-    Returns: { "isfile": bool }
-    """
-
     @web.authenticated
     @authorized
     def get(self, path):
-        if not path:
-            self.write_json({"error": "Missing 'path' parameter"}, status=400)
-            return
-        try:
-            result = self.fs_isfile(path)
-            self.write_json({"isfile": result})
-        except Exception as e:
-            _logger.exception("Error in IsFileHandler for path=%s", path)
-            self.write_json({"error": str(e)}, status=500)
+        result = self.fs_isfile(path)
+        self.write_json({"isfile": result})
 
 
 class IsDirHandler(BaseFSSpecHandler):
-    """
-    GET /fsspec/isdir?path=...
-    Returns: { "isdir": bool }
-    """
-
     @web.authenticated
     @authorized
     def get(self, path):
-        if not path:
-            self.write_json({"error": "Missing 'path' parameter"}, status=400)
-            return
-        try:
-            result = self.fs_isdir(path)
-            self.write_json({"isdir": result})
-        except Exception as e:
-            _logger.exception("Error in IsDirHandler for path=%s", path)
-            self.write_json({"error": str(e)}, status=500)
+        result = self.fs_isdir(path)
+        self.write_json({"isdir": result})
 
 
 class MkdirHandler(BaseFSSpecHandler):
-    """
-    POST /fsspec/mkdir?path=...
-    Optional: ?create_parents=true/false
-              ?exist_ok=false/true
-    """
-
     @web.authenticated
     @authorized
     def post(self, path):
-        if not path:
-            self.write_json({"error": "Missing 'path' parameter"}, status=400)
-            return
         create_parents = (self.get_argument("create_parents", "true").lower() == "true")
         exist_ok = (self.get_argument("exist_ok", "false").lower() == "true")
-
-        try:
-            result = self.fs_mkdir(path, create_parents=create_parents, exist_ok=exist_ok)
-            self.write_json(result)
-        except Exception as e:
-            _logger.exception("Error in MkdirHandler for path=%s", path)
-            self.write_json({"error": str(e)}, status=500)
+        result = self.fs_mkdir(path, create_parents=create_parents, exist_ok=exist_ok)
+        self.write_json(result)
 
 
 class RmdirHandler(BaseFSSpecHandler):
-    """
-    DELETE /fsspec/rmdir?path=...
-    Removes directory if empty
-    """
-
     @web.authenticated
     @authorized
     def delete(self, path):
-        if not path:
-            self.write_json({"error": "Missing 'path' parameter"}, status=400)
-            return
-        try:
-            result = self.fs_rmdir(path)
-            self.write_json(result)
-        except FileNotFoundError as e:
-            self.write_json({"error": str(e)}, status=404)
-        except OSError as e:
-            # e.g. OSError if directory not empty
-            self.write_json({"error": str(e)}, status=400)
-        except Exception as e:
-            _logger.exception("Error in RmdirHandler for path=%s", path)
-            self.write_json({"error": str(e)}, status=500)
+        result = self.fs_rmdir(path)
+        self.write_json(result)
 
 
 class RemoveFileHandler(BaseFSSpecHandler):
-    """
-    DELETE /fsspec/file?path=...
-    Optional: ?missing_ok=true/false
-    """
-
     @web.authenticated
     @authorized
     def delete(self, path):
-        if not path:
-            self.write_json({"error": "Missing 'path' parameter"}, status=400)
-            return
         missing_ok = (self.get_argument("missing_ok", "false").lower() == "true")
-        try:
-            result = self.fs_rm_file(path, missing_ok=missing_ok)
-            self.write_json(result)
-        except Exception as e:
-            _logger.exception("Error in RemoveFileHandler for path=%s", path)
-            self.write_json({"error": str(e)}, status=500)
+        result = self.fs_rm_file(path, missing_ok=missing_ok)
+        self.write_json(result)
 
 
 class TouchHandler(BaseFSSpecHandler):
-    """
-    POST /fsspec/touch?path=...
-    Optional: ?truncate=true/false
-    """
-
     @web.authenticated
     @authorized
     def post(self, path):
-        if not path:
-            self.write_json({"error": "Missing 'path' parameter"}, status=400)
-            return
         truncate = (self.get_argument("truncate", "true").lower() == "true")
-
-        try:
-            result = self.fs_touch(path, truncate=truncate)
-            self.write_json(result)
-        except Exception as e:
-            _logger.exception("Error in TouchHandler for path=%s", path)
-            self.write_json({"error": str(e)}, status=500)
+        result = self.fs_touch(path, truncate=truncate)
+        self.write_json(result)
 
 
 _path_regex = r"file://(?P<path>.+)"
