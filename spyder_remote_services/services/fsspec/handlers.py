@@ -1,4 +1,5 @@
 from __future__ import annotations
+from http import HTTPStatus
 from http.client import responses
 from typing import Any
 import traceback
@@ -37,22 +38,48 @@ class BaseFSSpecHandler(FSSpecRESTMixin, JupyterHandler):
     def write_error(self, status_code, **kwargs):
         """APIHandler errors are JSON, not human pages."""
         self.set_header("Content-Type", "application/json")
-        reason = responses.get(status_code, "Unknown HTTP Error")
-        reply: dict[str, Any] = {
-            "message": reason,
-        }
+        reply: dict[str, Any] = {}
         exc_info = kwargs.get("exc_info")
         if exc_info:
             e = exc_info[1]
             if isinstance(e, web.HTTPError):
-                reply["message"] = e.log_message or reason
+                reply["message"] = e.log_message or responses.get(status_code, "Unknown HTTP Error")
                 reply["reason"] = e.reason
+            elif isinstance(e, OSError):
+                self.set_status(HTTPStatus.EXPECTATION_FAILED)
+                reply["strerror"] = e.strerror
+                reply["errno"] = e.errno
+                reply["filename"] = e.filename
             else:
-                reply["type"] = type(e).__name__
+                self.set_status(HTTPStatus.INTERNAL_SERVER_ERROR)
+                reply["type"] = str(type(e))
                 reply["message"] = str(e)
                 reply["traceback"] = traceback.format_exception(*exc_info)
-        self.log.warning("wrote error: %r", reply["message"], exc_info=True)
+        else:
+            reply["message"] = responses.get(status_code, "Unknown HTTP Error")
         self.finish(orjson.dumps(reply))
+
+    def log_exception(self, typ, value, tb):
+        """Log uncaught exceptions."""
+        if isinstance(value, web.HTTPError):
+            if value.log_message:
+                format = "%d %s: " + value.log_message
+                args = [value.status_code, self._request_summary()] + list(value.args)
+                self.log.warning(format, *args)
+        elif isinstance(value, OSError):
+            self.log.debug(
+                "OSError [Errno %s] %s",
+                value.errno,
+                self._request_summary(),
+                exc_info=(typ, value, tb),  # type: ignore
+            )
+        else:
+            self.log.warning(
+                "Uncaught exception %s\n%r",
+                self._request_summary(),
+                self.request,
+                exc_info=(typ, value, tb),  # type: ignore
+            )
 
 class LsHandler(BaseFSSpecHandler):
     @web.authenticated
