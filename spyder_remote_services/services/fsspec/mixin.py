@@ -5,7 +5,7 @@ import datetime
 from http import HTTPStatus
 import os
 from pathlib import Path
-from shutil import copy2, copystat
+from shutil import copy, copy2
 import stat
 import threading
 import time
@@ -417,4 +417,14 @@ class FSSpecRESTMixin:
             # create or overwrite
             with path.open("wb"):
                 pass
+        return {"success": True}
+
+    def fs_copy(self, src_str: str, dst_str: str, metadata: bool=False):
+        """Like fsspec.copy()."""
+        src = self._load_path(src_str)
+        dst = self._load_path(dst_str)
+        if metadata:
+            copy2(src, dst)
+        else:
+            copy(src, dst)
         return {"success": True}

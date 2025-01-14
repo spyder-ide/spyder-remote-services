@@ -160,6 +160,15 @@ class TouchHandler(BaseFSSpecHandler):
         self.write_json(result)
 
 
+class CopyHandler(BaseFSSpecHandler):
+    @web.authenticated
+    @authorized
+    def post(self, src, dest):
+        metadata = (self.get_argument("metadata", "false").lower() == "true")
+        result = self.fs_copy(src, dest, metadata=metadata)
+        self.write_json(result)
+
+
 _path_regex = r"file://(?P<path>.+)"
 
 handlers = [
@@ -173,4 +182,5 @@ handlers = [
     (rf"/fsspec/rmdir/{_path_regex}", RmdirHandler),            # DELETE
     (rf"/fsspec/file/{_path_regex}", RemoveFileHandler),        # DELETE
     (rf"/fsspec/touch/{_path_regex}", TouchHandler),            # POST
+    (rf"/fsspec/copy/{_path_regex}", CopyHandler),              # POST
 ]
