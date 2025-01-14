@@ -2,7 +2,9 @@ from __future__ import annotations
 import asyncio
 import base64
 import datetime
+import errno
 from http import HTTPStatus
+from io import FileIO
 import os
 from pathlib import Path
 from shutil import copy, copy2
@@ -10,7 +12,6 @@ import stat
 import threading
 import time
 import traceback
-from io import FileIO
 
 import orjson
 from tornado.websocket import WebSocketHandler
@@ -105,7 +106,6 @@ class FileOpenWebSocketHandler(WebSocketHandler):
                             "w" in self.mode):
             if self.path.exists() and "w" not in self.mode:
                 copy2(self.path, self.atomic_path)
-                copystat(self.path, self.atomic_path)
             return self.atomic_path.open(self.mode)
 
         return self.path.open(self.mode)
@@ -191,12 +191,13 @@ class FileOpenWebSocketHandler(WebSocketHandler):
                                 tracebacks=traceback.format_exception(type(error),
                                                                      error,
                                                                      error.__traceback__),
-                                type=type(error).__name__)
+                                type=str(type(error)))
 
     def _parse_os_error(self, e: OSError) -> bytes:
         """Parse an OSError response to the client."""
         return self._parse_json(HTTPStatus.EXPECTATION_FAILED,
-                                message=str(e),
+                                strerror=e.strerror,
+                                filename=e.filename,
                                 errno=e.errno)
 
     async def _send_msg_error(self, message):
@@ -336,18 +337,16 @@ class FSSpecRESTMixin:
         return result
 
     def _load_path(self, path_str: str) -> Path | None:
-        """Convert a path string to a pathlib.Path object safely."""
-        try:
-            return Path(path_str).expanduser()
-        except Exception as e:
-            self.log.exception("Failed to load path: %s", path_str)
-            raise e  # Up to the handler to convert to HTTP error.
+        """Convert a path string to a pathlib.Path object."""
+        return Path(path_str).expanduser()
 
     def fs_ls(self, path_str: str, detail: bool = True):
         """List objects at path, like fsspec.ls()."""
         path = self._load_path(path_str)
         if not path.exists():
-            raise FileNotFoundError(f"Path not found: {path}")
+            raise FileNotFoundError(errno.ENOENT,
+                                    os.strerror(errno.ENOENT),
+                                    str(path))
         if path.is_file():
             # fsspec.ls of a file often returns a single entry
             if detail:
@@ -367,8 +366,6 @@ class FSSpecRESTMixin:
     def fs_info(self, path_str: str):
         """Get info about a single path, like fsspec.info()."""
         path = self._load_path(path_str)
-        if not path.exists():
-            raise FileNotFoundError(f"Path not found: {path}")
         return self._info_for_path(path)
 
     def fs_exists(self, path_str: str) -> bool:
