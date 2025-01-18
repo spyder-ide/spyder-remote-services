@@ -1,6 +1,7 @@
 from __future__ import annotations
 from http import HTTPStatus
 from http.client import responses
+import re
 from typing import Any
 import traceback
 
@@ -164,7 +165,7 @@ class CopyHandler(BaseFSSpecHandler):
     @web.authenticated
     @authorized
     def post(self, path):
-        dest = self.get_argument("dest")
+        dest = re.match(_path_regex, self.get_argument("dest")).group("path")
         metadata = (self.get_argument("metadata", "false").lower() == "true")
         result = self.fs_copy(path, dest, metadata=metadata)
         self.write_json(result)
