@@ -11,14 +11,14 @@ from jupyter_server.base.websocket import WebSocketMixin
 import orjson
 from tornado import web
 
-from spyder_remote_services.services.fsspec.mixin import (
-    FileOpenWebSocketHandler,
-    FSSpecRESTMixin,
+from spyder_remote_services.services.files.base import (
+    FileWebSocketHandler,
+    FilesRESTMixin,
 )
 
 
 class ReadWriteWebsocketHandler(WebSocketMixin,
-                                FileOpenWebSocketHandler,
+                                FileWebSocketHandler,
                                 JupyterHandler):
     auth_resource = "spyder-services"
 
@@ -28,7 +28,7 @@ class ReadWriteWebsocketHandler(WebSocketMixin,
         await super().get(*args, **kwargs)
 
 
-class BaseFSSpecHandler(FSSpecRESTMixin, JupyterHandler):
+class BaseFSSpecHandler(FilesRESTMixin, JupyterHandler):
     auth_resource = "spyder-services"
 
     def write_json(self, data, status=200):

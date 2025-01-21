@@ -17,7 +17,7 @@ import orjson
 from tornado.websocket import WebSocketHandler
 
 
-class FileOpenWebSocketHandler(WebSocketHandler):
+class FileWebSocketHandler(WebSocketHandler):
     """
     WebSocket handler for opening files and streaming data.
 
@@ -292,7 +292,7 @@ class FileOpenWebSocketHandler(WebSocketHandler):
         return self.file.writable()
 
 
-class FSSpecRESTMixin:
+class FilesRESTMixin:
     """
     REST handler for fsspec-like filesystem operations, using pathlib.Path.
 
