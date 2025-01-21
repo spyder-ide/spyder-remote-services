@@ -58,8 +58,12 @@ class FileWebSocketHandler(WebSocketHandler):
             self.path = self._load_path(path)
 
             if lock and not await self._acquire_lock(path):
-                self.close(1002, self._parse_json(HTTPStatus.LOCKED,
-                                                  message="File is locked"))
+                self.close(
+                    1002,
+                    self._parse_json(
+                        HTTPStatus.LOCKED, message="File is locked"
+                    ),
+                )
                 return
 
             self.file = await self._open_file()
@@ -90,9 +94,7 @@ class FileWebSocketHandler(WebSocketHandler):
 
     # ----------------------------------------------------------------
     # Internal Helpers
-    # ----------------------------------------------------------------
-    async def handle_message(self, raw_message):
-        """Handle incoming JSON messages (read/write commands only)."""
+        method, kwargs = await self._parse_message(msg)
         msg = self._decode_json(raw_message)
 
         method, kwargs = await self._parse_message(msg)
@@ -186,33 +188,40 @@ class FileWebSocketHandler(WebSocketHandler):
 
     def _parse_error(self, error: BaseException) -> bytes:
         """Parse an error response to the client."""
-        return self._parse_json(HTTPStatus.INTERNAL_SERVER_ERROR,
-                                message=str(error),
-                                tracebacks=traceback.format_exception(type(error),
-                                                                     error,
-                                                                     error.__traceback__),
-                                type=str(type(error)))
+        return self._parse_json(
+            HTTPStatus.INTERNAL_SERVER_ERROR,
+            message=str(error),
+            tracebacks=traceback.format_exception(
+                type(error), error, error.__traceback__
+            ),
+            type=str(type(error)),
+        )
 
     def _parse_os_error(self, e: OSError) -> bytes:
         """Parse an OSError response to the client."""
-        return self._parse_json(HTTPStatus.EXPECTATION_FAILED,
-                                strerror=e.strerror,
-                                filename=e.filename,
-                                errno=e.errno)
+        return self._parse_json(
+            HTTPStatus.EXPECTATION_FAILED,
+            strerror=e.strerror,
+            filename=e.filename,
+            errno=e.errno,
+        )
 
     async def _send_msg_error(self, message):
-        await self._send_json(HTTPStatus.BAD_REQUEST,
-                              message=message)
+        await self._send_json(
+            HTTPStatus.BAD_REQUEST, message=message,
+        )
 
     async def _send_result(self, result):
         if result is None:
             await self._send_json(HTTPStatus.NO_CONTENT)
         elif isinstance(result, list):
-            await self._send_json(HTTPStatus.OK,
-                                  data=[self._encode_data(r) for r in result])
+            await self._send_json(
+                HTTPStatus.OK, data=[self._encode_data(r) for r in result],
+            )
         else:
-            await self._send_json(HTTPStatus.OK,
-                                  data=self._encode_data(result))
+            await self._send_json(
+                HTTPStatus.OK, data=self._encode_data(result),
+            )
 
     def _decode_data(self, data: str | object) -> str | bytes | object:
         """Decode data from a message."""
