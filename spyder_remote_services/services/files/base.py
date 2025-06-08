@@ -433,3 +433,14 @@ class FilesRESTMixin:
         else:
             copy(src, dst)
         return {"success": True}
+
+    def fs_move(self, src_str: str, dst_str: str):
+        """Like fsspec.move()."""
+        src = self._load_path(src_str)
+        dst = self._load_path(dst_str)
+        if not src.exists():
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), str(src))
+        if dst.exists():
+            raise FileExistsError(errno.EEXIST, os.strerror(errno.EEXIST), str(dst))
+        src.rename(dst)
+        return {"success": True}

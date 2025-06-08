@@ -247,6 +247,16 @@ class CopyHandler(BaseFSHandler):
         self.write_json(result)
 
 
+class MoveHandler(BaseFSHandler):
+    @web.authenticated
+    @authorized
+    def post(self):
+        path = self.get_path_argument("path")
+        dest = self.get_path_argument("dest")
+        result = self.fs_move(path, dest)
+        self.write_json(result)
+
+
 _path_regex = r"file://(?P<path>.+)"
 
 handlers = [
@@ -261,4 +271,5 @@ handlers = [
     (r"/fs/file", RemoveFileHandler),        # DELETE
     (r"/fs/touch", TouchHandler),            # POST
     (r"/fs/copy", CopyHandler),              # POST
+    (r"/fs/move", MoveHandler),
 ]
