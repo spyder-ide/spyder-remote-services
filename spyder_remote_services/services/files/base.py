@@ -1,10 +1,10 @@
 from __future__ import annotations
 import asyncio
 import base64
+from contextlib import contextmanager
 import datetime
 import errno
 from http import HTTPStatus
-from io import FileIO
 import os
 from pathlib import Path
 from shutil import copy, copy2
@@ -12,9 +12,16 @@ import stat
 import threading
 import time
 import traceback
+import typing
+import zlib
 
 import orjson
 from tornado.websocket import WebSocketHandler
+
+from spyder_remote_services.services.files.compression import ZipStream, MemberFile, CompressionType
+
+if typing.TYPE_CHECKING:
+    from io import FileIO
 
 
 class FileWebSocketHandler(WebSocketHandler):
@@ -444,3 +451,42 @@ class FilesRESTMixin:
             raise FileExistsError(errno.EEXIST, os.strerror(errno.EEXIST), str(dst))
         src.rename(dst)
         return {"success": True}
+
+    @contextmanager
+    def fs_zip_dir(
+        self,
+        path_str: str,
+        compression: int = 9,
+        chunk_size: int = 65536,
+    ):
+        """Stream compressed directory content."""
+        path = self._load_path(path_str)
+
+        zip_files = []
+        for p in path.glob("**/*"):
+            if p.is_file():
+                arcname = p.relative_to(path)
+                zip_files.append(
+                    MemberFile(
+                        name=str(arcname),
+                        modified_at=datetime.datetime.fromtimestamp(p.stat().st_mtime),
+                        data=p.open("rb"),
+                        mode=0x7777 & p.stat().st_mode,
+                        size=p.stat().st_size,
+                        method=CompressionType.ZIP_64,
+                    )
+                )
+
+        try:
+            if not zip_files:
+                yield None
+            else:
+                yield ZipStream(zip_files,
+                    get_compressobj=lambda: zlib.compressobj(
+                        wbits=-zlib.MAX_WBITS, level=compression,
+                    ),
+                    chunk_size=chunk_size,
+                )
+        finally:
+            for f in zip_files:
+                f.data.close()
