@@ -212,7 +212,10 @@ class RmdirHandler(BaseFSHandler):
     @web.authenticated
     @authorized
     def delete(self):
-        result = self.fs_rmdir(self.get_path_argument("path"))
+        result = self.fs_rmdir(
+            self.get_path_argument("path"),
+            non_empty=(self.get_argument("non_empty", "false").lower() == "true"),
+        )
         self.write_json(result)
 
 
