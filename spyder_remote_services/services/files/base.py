@@ -7,7 +7,7 @@ import errno
 from http import HTTPStatus
 import os
 from pathlib import Path
-from shutil import copy, copy2
+from shutil import copy, copy2, rmtree
 import stat
 import threading
 import time
@@ -404,10 +404,13 @@ class FilesRESTMixin:
         path.mkdir(parents=create_parents, exist_ok=exist_ok)
         return {"success": True}
 
-    def fs_rmdir(self, path_str: str):
+    def fs_rmdir(self, path_str: str, non_empty: bool = False):
         """Like fsspec.rmdir() - remove if empty."""
         path = self._load_path(path_str)
-        path.rmdir()
+        if non_empty:
+            rmtree(path)
+        else:
+            path.rmdir()
         return {"success": True}
 
     def fs_rm_file(self, path_str: str, missing_ok: bool = False):
