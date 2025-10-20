@@ -38,7 +38,7 @@ KERNEL_VERSION=${2:-latest}
 SERVER_ENV="spyder-remote"
 KERNEL_ENV="spyder-kernel"
 
-MICROMAMBA_VERSION="latest"
+MICROMAMBA_VERSION="2.1.0"
 BIN_FOLDER="${HOME}/.local/bin"
 PREFIX_LOCATION="${HOME}/micromamba"
 
