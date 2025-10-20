@@ -42,7 +42,7 @@ MICROMAMBA_VERSION="2.1.0"
 BIN_FOLDER="${HOME}/.local/bin"
 PREFIX_LOCATION="${HOME}/micromamba"
 
-PYTHON_VERSION="3.12"
+PYTHON_VERSION="3.13"
 
 
 # Detecting platform
