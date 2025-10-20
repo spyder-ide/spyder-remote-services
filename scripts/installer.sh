@@ -75,7 +75,7 @@ esac
 
 
 # Install micromamba
-RELEASE_URL="https://github.com/mamba-org/micromamba-releases/releases/${MICROMAMBA_VERSION}/download/micromamba-${PLATFORM}-${ARCH}"
+RELEASE_URL="https://github.com/mamba-org/micromamba-releases/releases/download/${MICROMAMBA_VERSION}/micromamba-${PLATFORM}-${ARCH}"
 
 mkdir -p "${BIN_FOLDER}"
 download "${RELEASE_URL}" "${BIN_FOLDER}/micromamba"
