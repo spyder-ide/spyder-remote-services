@@ -414,7 +414,7 @@ class FilesRESTMixin:
         """Like fsspec.rmdir() - remove if empty."""
         path = self._load_path(path_str)
         if non_empty:
-            rmtree(path)
+            rmtree(str(path))
         else:
             path.rmdir()
         return {"success": True}
