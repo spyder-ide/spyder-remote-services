@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling>=1.5"]
+requires = ["hatchling>=1.5", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
@@ -42,7 +42,10 @@ test = [
 "spyder-server" = "spyder_remote_services.app:main"
 
 [tool.hatch.version]
-path = "spyder_remote_services/__init__.py"
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "spyder_remote_services/_version.py"
 
 [tool.hatch.build.targets.wheel.shared-data]
 "jupyter-config" = "etc/jupyter/jupyter_server_config.d"
