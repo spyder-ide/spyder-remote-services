@@ -102,11 +102,11 @@ fi
 # Create spyder-kernels env
 if [ -z "$("${MICROMAMBA}" env list | grep spyder-kernel)" ]; then
     if [ $KERNEL_VERSION == "latest" ]; then
-      "${MICROMAMBA}" create -y -n $KERNEL_ENV -c conda-forge -c conda-forge/label/spyder_kernels_rc "python=${PYTHON_VERSION}" spyder-kernels
+      "${MICROMAMBA}" create -y -n $KERNEL_ENV -c conda-forge -c conda-forge/label/spyder_kernels_rc -c conda-forge/label/spyder_kernels_dev "python=${PYTHON_VERSION}" spyder-kernels
     elif [[ $KERNEL_VERSION != *"="* ]] && [[ $KERNEL_VERSION != *">="* ]] && [[ $KERNEL_VERSION != *"<="* ]] && [[ $KERNEL_VERSION != *">"* ]] && [[ $KERNEL_VERSION != *"<"* ]]; then
-      "${MICROMAMBA}" create -y -n $KERNEL_ENV -c conda-forge -c conda-forge/label/spyder_kernels_rc "python=${PYTHON_VERSION}" "spyder-kernels=$KERNEL_VERSION"
+      "${MICROMAMBA}" create -y -n $KERNEL_ENV -c conda-forge -c conda-forge/label/spyder_kernels_rc -c conda-forge/label/spyder_kernels_dev "python=${PYTHON_VERSION}" "spyder-kernels=$KERNEL_VERSION"
     else
-      "${MICROMAMBA}" create -y -n $KERNEL_ENV -c conda-forge -c conda-forge/label/spyder_kernels_rc "python=${PYTHON_VERSION}" "spyder-kernels${KERNEL_VERSION}"
+      "${MICROMAMBA}" create -y -n $KERNEL_ENV -c conda-forge -c conda-forge/label/spyder_kernels_rc -c conda-forge/label/spyder_kernels_dev "python=${PYTHON_VERSION}" "spyder-kernels${KERNEL_VERSION}"
     fi
 
     "${MICROMAMBA}" run -n $KERNEL_ENV python -m ipykernel install --user --name $KERNEL_ENV
